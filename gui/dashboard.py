@@ -1,8 +1,14 @@
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import ttk
+from utils.encryption import derive_key, encrypt_service_password, decrypt_service_password
+from utils.credential_utilities import load_user_credentials, save_user_credentials, get_user_file
 
-def run_dashboard(username="User"):
+
+def run_dashboard(username="User", master_password=""):
+    #derive encryption key from users login password
+    encryption_key = derive_key(master_password)
+
     #main dashboard
     root = tk.Tk()
     root.title("HashVault - Dashboard")
@@ -35,6 +41,14 @@ def run_dashboard(username="User"):
     columns = ("Service", "Username", "Password", "RealPassword", "Action")
     tree = ttk.Treeview(main_frame, columns=columns, show="headings", height=10)
 
+    #loading user credentials
+    credentials = load_user_credentials(username)
+    for cred in credentials:
+        service = cred["service"]
+        user = cred["username"]
+        encrypted_password = cred["password"]
+        tree.insert("", "end", values=(service, user, "********", encrypted_password, "Show"))
+    
     #columns 
     for col in columns:
         if col == "RealPassword":
@@ -64,7 +78,7 @@ def run_dashboard(username="User"):
         popup.title("Add Credential")
         popup.geometry("400x300")
         popup.configure(bg=bg_main)
-        popup.grab_set()
+        popup.after(1, lambda: popup.grab_set())
 
         style.configure("Popup.TLabel", background=bg_main, font=("Bahnschrift", 12))
         style.configure("Popup.TButton", font=("Bahnschrift", 11))
@@ -89,7 +103,16 @@ def run_dashboard(username="User"):
             pwd = entry_password.get()
 
             if service and uname and pwd:
-                tree.insert("", "end", values=(service, uname, "********", pwd, "Show"))
+                encrypted = encrypt_service_password(encryption_key, pwd)
+                tree.insert("", "end", values=(service, uname, "********", encrypted, "Show"))
+                # Save to file
+                credentials = load_user_credentials(username)
+                credentials.append({
+                    "service" : service,
+                    "username" : uname,
+                    "password" : encrypted
+                })
+                save_user_credentials(username, credentials)
                 popup.destroy()
 
         #submit and cancel buttons
@@ -107,7 +130,7 @@ def run_dashboard(username="User"):
         popup.title("Enter Decryption Key")
         popup.geometry("400x200")
         popup.configure(bg=bg_main)
-        popup.grab_set()
+        popup.after(1, lambda: popup.grab_set())
 
         ttk.Label(popup, text=f"Enter decryption key to view password for {service}:", font=("Bahnschrift", 12),
                   background=bg_main).pack(pady=20)
@@ -117,9 +140,12 @@ def run_dashboard(username="User"):
         #when the decrypt is clicked it shows password
         def reveal():
             key = entry_key.get()
-            # TODO: Real decryption logic using the key
-            tree.set(item_id, column="Password", value=real_password)
-            popup.destroy()
+            try:
+                plain = decrypt_service_password(encryption_key, real_password)
+                tree.set(item_id, column="Password", value=plain)
+                popup.destroy()
+            except Exception as e:
+                messagebox.showerror("Decryption failed", str(e))
 
         ttk.Button(popup, text="Decrypt", command=reveal).pack(pady=20)
 
