@@ -2,7 +2,10 @@ import os
 import json
 
 def get_user_file(username) :
-    return f"{username}_data.json"
+    #uploading files to data path
+    base_dir = os.path.join("data", username)
+    os.makedirs(base_dir, exist_ok=True)
+    return os.path.join(base_dir, "credentials.json")
 
 def load_user_credentials(username) :
     # Get specified user file

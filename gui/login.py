@@ -9,7 +9,7 @@ def run_login():
         username = entry_username.get()
         password = entry_password.get()
         root.destroy()  # close login window
-        run_dashboard(username)  # open dashboard 
+        run_dashboard(username, password)  # open dashboard 
 
     #clicks register
     def handle_register():
