@@ -31,45 +31,18 @@ def users_exists(username):
    
     
 def register(username, password):
+    load_users()
     if users_exists(username):
-        print("User already exisits")
-        return 
+        return False, "User already exists"
     user_data[username] = {
             "password": hash_password(password),
             "services": {}}
     save_users()
-    print("Registration Sucessful")
+    return True, "User registered successfully"
 
-def login(username, password):
-    global current_user
+def authenticate(username, password):
     load_users()
-
     hashed = hash_password(password)
     if username in user_data and user_data[username]["password"] == hashed:
-        current_user = username
-        print("Login successful")
-    else: print("Login failed")
-
-def addService(service, service_user, service_password):
-    
-    if not current_user:
-        print("Please login in first")
-        return
-    hashed = hash_password(service_password)
-    user_data[current_user]["services"][service] = {"username": service_user,
-                                            "password": hashed}
-    save_users()
-    print(f"Service '{service}' added.")
-
-def show_services():
-    if not current_user:
-        print("Please log in first.")
-        return
-
-    services = user_data[current_user].get("services", {})
-    if not services:
-        print("No services saved.")
-    else:
-        for name, creds in services.items():
-            print(f"{name}: {creds['username']} / {creds['password']}")
-
+        return True
+    return False
