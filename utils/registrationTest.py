@@ -30,31 +30,39 @@ def users_exists(username):
     return username in users
    
     
-def register(username, password):
+def register():
+    username = input("Enter username: ")
     if users_exists(username):
         print("User already exisits")
         return 
+    
+    password = input("Enter a new password: ")
     user_data[username] = {
             "password": hash_password(password),
             "services": {}}
     save_users()
     print("Registration Sucessful")
 
-def login(username, password):
+def login():
     global current_user
     load_users()
 
+    username = input("Enter username: ")
+    password = input("Enter the password: ")
     hashed = hash_password(password)
     if username in user_data and user_data[username]["password"] == hashed:
         current_user = username
         print("Login successful")
     else: print("Login failed")
 
-def addService(service, service_user, service_password):
+def addService():
     
     if not current_user:
         print("Please login in first")
         return
+    service = input("Service name: ")
+    service_user = input("Enter service username: ")
+    service_password = input("Enter service password: ")
     hashed = hash_password(service_password)
     user_data[current_user]["services"][service] = {"username": service_user,
                                             "password": hashed}
@@ -73,3 +81,17 @@ def show_services():
         for name, creds in services.items():
             print(f"{name}: {creds['username']} / {creds['password']}")
 
+
+def main():
+    options = {'1': register, '2': login, '3': addService, '4': show_services, '5': exit}
+    while True:
+        print("\n 1.Resgier\n 2.Login\n \n 3.Add Servive \n 4.Show Service \n 5.exit")
+        choice = input("choose an option: ")
+        action = options.get(choice)
+        if action:  
+            action()
+        else:
+            print("invalid option")
+
+if __name__ == "__main__":
+    main()
