@@ -2,20 +2,29 @@ import tkinter as tk
 from tkinter import messagebox
 from tkinter import ttk
 from .dashboard import run_dashboard #to switch after login
+from utils.registration import authenticate, register  # NEW
+from gui.dashboard import run_dashboard
 
 def run_login():
     #clicks login
     def handle_login():
         username = entry_username.get()
         password = entry_password.get()
-        root.destroy()  # close login window
-        run_dashboard(username, password)  # open dashboard 
+        if authenticate(username, password):
+            root.destroy()
+            run_dashboard(username, password)  # pass for encryption key
+        else:
+            messagebox.showerror("Login Failed", "Invalid username or password.")
 
     #clicks register
     def handle_register():
         username = entry_username.get()
         password = entry_password.get()
-        messagebox.showinfo("Register", f"Registering: {username}")
+        success, msg = register(username, password)
+        if success:
+            messagebox.showinfo("Register", msg)
+        else:
+            messagebox.showerror("Error Registering", msg)
 
     #window styling
     root = tk.Tk()

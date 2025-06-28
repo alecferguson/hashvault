@@ -38,7 +38,7 @@ def run_dashboard(username="User", master_password=""):
     ttk.Label(main_frame, text=f"Welcome, {username}", style="Header.TLabel").pack(anchor="w", pady=(0, 20))
 
     #table to show all the details of the services and related details
-    columns = ("Service", "Username", "Password", "RealPassword", "Action")
+    columns = ("Service", "Username", "Password", "Action", "Delete")
     tree = ttk.Treeview(main_frame, columns=columns, show="headings", height=10)
 
     #loading user credentials
@@ -47,7 +47,7 @@ def run_dashboard(username="User", master_password=""):
         service = cred["service"]
         user = cred["username"]
         encrypted_password = cred["password"]
-        tree.insert("", "end", values=(service, user, "********", encrypted_password, "Show"))
+        tree.insert("", "end", values=(service, user, "********", "Show", "Delete"))
     
     #columns 
     for col in columns:
@@ -98,22 +98,34 @@ def run_dashboard(username="User", master_password=""):
 
         #saves the info and display
         def handle_submit():
-            service = entry_service.get()
-            uname = entry_username.get()
-            pwd = entry_password.get()
+            service = entry_service.get().strip()
+            uname = entry_username.get().strip()
+            pwd = entry_password.get().strip()
 
-            if service and uname and pwd:
+            # Input validation
+            if not service or not uname or not pwd:
+                messagebox.showerror("Error", "All fields are required!")
+                return
+
+            try:
                 encrypted = encrypt_service_password(encryption_key, pwd)
-                tree.insert("", "end", values=(service, uname, "********", encrypted, "Show"))
-                # Save to file
+                
+                # Save to file first
                 credentials = load_user_credentials(username)
                 credentials.append({
-                    "service" : service,
-                    "username" : uname,
-                    "password" : encrypted
+                    "service": service,
+                    "username": uname,
+                    "password": encrypted
                 })
                 save_user_credentials(username, credentials)
+                
+                # add to tree with correct column order: Service, Username, Password, Action, Delete
+                tree.insert("", "end", values=(service, uname, "********", "Show", "Delete"))
+                
                 popup.destroy()
+                messagebox.showinfo("Success", "Credential added successfully!")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save credential: {str(e)}")
 
         #submit and cancel buttons
         btn_frame = tk.Frame(popup, bg=bg_main)
@@ -121,45 +133,47 @@ def run_dashboard(username="User", master_password=""):
         ttk.Button(btn_frame, text="Submit", style="Popup.TButton", command=handle_submit).grid(row=0, column=0, padx=10)
         ttk.Button(btn_frame, text="Cancel", style="Popup.TButton", command=popup.destroy).grid(row=0, column=1, padx=10)
 
-    #password popup with needing key input
-    def show_password_popup(item_id):
+    def toggle_password(item_id):
         values = tree.item(item_id, "values")
-        service, username, _, real_password, _ = values
-
-        popup = tk.Toplevel()
-        popup.title("Enter Decryption Key")
-        popup.geometry("400x200")
-        popup.configure(bg=bg_main)
-        popup.after(1, lambda: popup.grab_set())
-
-        ttk.Label(popup, text=f"Enter decryption key to view password for {service}:", font=("Bahnschrift", 12),
-                  background=bg_main).pack(pady=20)
-        entry_key = ttk.Entry(popup, width=30, show="*")
-        entry_key.pack()
-
-        #when the decrypt is clicked it shows password
-        def reveal():
-            key = entry_key.get()
-            try:
-                plain = decrypt_service_password(encryption_key, real_password)
-                tree.set(item_id, column="Password", value=plain)
-                popup.destroy()
-            except Exception as e:
-                messagebox.showerror("Decryption failed", str(e))
-
-        ttk.Button(popup, text="Decrypt", command=reveal).pack(pady=20)
+        service, user, current_password, action, delete = values
+        
+        if current_password == "********":
+            # Show password - decrypt from file
+            credentials = load_user_credentials(username)
+            for cred in credentials:
+                if cred["service"] == service and cred["username"] == user:
+                    decrypted = decrypt_service_password(encryption_key, cred["password"])
+                    tree.set(item_id, column="Password", value=decrypted)
+                    tree.set(item_id, column="Action", value="Hide")  # ← Changes button to "Hide"
+                    break
+        else:
+            # Hide password
+            tree.set(item_id, column="Password", value="********")
+            tree.set(item_id, column="Action", value="Show")  # Changes button back to "Show"
+    
+    #delete credential function
+    def delete_credential(item_id):
+        values = tree.item(item_id, "values")
+        service, user = values[0], values[1]
+        
+        if messagebox.askyesno("Confirm Delete", f"Delete credential for {service}?"):
+            credentials = load_user_credentials(username)
+            credentials = [c for c in credentials if not (c["service"] == service and c["username"] == user)]
+            save_user_credentials(username, credentials)
+            tree.delete(item_id)
+            messagebox.showinfo("Success", "Credential deleted successfully!")
 
     #if show is clicked
     def on_tree_click(event):
         region = tree.identify("region", event.x, event.y)
         if region == "cell":
             col = tree.identify_column(event.x)
-            if col == "#5":  # Show button
-                row_id = tree.identify_row(event.y)
-                if row_id:
-                    show_password_popup(row_id)
-
+            row_id = tree.identify_row(event.y)
+            if row_id:
+                if col == "#4":  # Show/Hide button
+                    toggle_password(row_id)
+                elif col == "#5":  # Delete button  ← NEW
+                    delete_credential(row_id)
     #manage click
     tree.bind("<Button-1>", on_tree_click)
-
     root.mainloop()
